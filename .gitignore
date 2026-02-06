@@ -1,0 +1,73 @@
+# [1. OS 및 개인 설정]
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# [2. 보안 및 환경 변수 - 절대 공유 금지]
+.env*
+*.pem
+
+# [3. 파이썬 (Backend) - 핵심 보호]
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# [4. 노드/Next.js (Frontend) - 핵심 보호]
+node_modules/
+.next/
+out/
+/coverage/   # 테스트 결과 리포트 제외
+.pnp*        # Yarn 사용 시 대비
+.yarn/*      # Yarn 사용 시 대비
+
+# [5. 배포 및 빌드 로그]
+.vercel
+*.log
+*.tsbuildinfo
+next-env.d.ts
+
+# [6. AI 협업 지침서 - 사용자님 전용]
+.gitkeep
+.gitignore
+
+.agent/
+.agent
+.plans(old)
+.plans(old)/
+
+docs/.idea_kugnus
+docs/.idea_kugnus/
+
+docs/.plans_kugnus
+docs/.plans_kugnus/
+
+ngrok.yml
+
+.plan
+.plan/
+
+.backup
+.backup/
+/backend/uploads
+
+.claude
+.claude/
+
+docs/
+
+.sisyphus
+.sisyphus/
+
+.pytest_cache
+.pytest_cache/
+
+docs/
+
+# [.md 파일 관리]
+**/*.md
+!README.md

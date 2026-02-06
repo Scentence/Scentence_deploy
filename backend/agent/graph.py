@@ -94,10 +94,7 @@ def log_filters(h_filters: dict, s_filters: dict):
     pass
 
 
-def generate_pre_notice(
-    requested: int,
-    is_explicit: bool
-) -> str:
+def generate_pre_notice(requested: int, is_explicit: bool) -> str:
     """
     스트리밍 전에 출력 가능한 안내 메시지를 생성합니다.
     (케이스 1: 과다 요청)
@@ -113,17 +110,15 @@ def generate_pre_notice(
 
     # 케이스 1: 과다 요청 (명시적일 때만)
     if is_explicit and requested > MAX_COUNT:
-        return (f"\n💡 안내: 한 번에 최대 {MAX_COUNT}개까지만 추천이 가능합니다. "
-                f"{MAX_COUNT}개의 향수를 엄선하여 추천드렸습니다.\n\n")
+        return (
+            f"\n💡 안내: 한 번에 최대 {MAX_COUNT}개까지만 추천이 가능합니다. "
+            f"{MAX_COUNT}개의 향수를 엄선하여 추천드렸습니다.\n\n"
+        )
 
     return ""
 
 
-def generate_post_notice(
-    requested: int,
-    actual: int,
-    is_explicit: bool
-) -> str:
+def generate_post_notice(requested: int, actual: int, is_explicit: bool) -> str:
     """
     스트리밍 후에 출력 가능한 안내 메시지를 생성합니다.
     (케이스 2: 부분 실패)
@@ -138,8 +133,10 @@ def generate_post_notice(
     """
     # 케이스 2: 부분 실패 (명시적 요청일 때만!)
     if is_explicit and actual < requested:
-        return (f"\n💡 안내: 요청하신 {requested}개 중 {actual}개의 향수를 찾았습니다. "
-                f"조건에 맞는 향수가 제한적이었습니다.")
+        return (
+            f"\n💡 안내: 요청하신 {requested}개 중 {actual}개의 향수를 찾았습니다. "
+            f"조건에 맞는 향수가 제한적이었습니다."
+        )
 
     return ""
 
@@ -178,10 +175,10 @@ async def call_info_graph_wrapper(state: AgentState):
 
     try:
         result = await info_graph.ainvoke(subgraph_input)
-        
+
         # [Wave 2-4] Map info_status to chat_outcome_status
         info_status = result.get("info_status", "OK")
-        
+
         return {
             "messages": result.get("messages", []),
             "chat_outcome_status": info_status,  # OK/NO_RESULTS/ERROR 직접 매핑
@@ -191,8 +188,9 @@ async def call_info_graph_wrapper(state: AgentState):
 
     except Exception as e:
         import traceback
+
         traceback.print_exc()
-        
+
         # [Wave 2-4] Set ERROR status on exception
         return {
             "messages": [AIMessage(content="정보 검색 중 오류가 발생했습니다.")],
@@ -221,11 +219,14 @@ def pre_validator_node(state: AgentState):
         result = SMART_LLM.with_structured_output(ValidationResult).invoke(messages)
 
         if result.is_unsupported:
-            print(f"   ❌ 지원 불가: {result.unsupported_category} - {result.reason}", flush=True)
+            print(
+                f"   ❌ 지원 불가: {result.unsupported_category} - {result.reason}",
+                flush=True,
+            )
             return {
                 "validation_result": "unsupported",
                 "unsupported_category": result.unsupported_category,
-                "unsupported_reason": result.reason
+                "unsupported_reason": result.reason,
             }
         else:
             print(f"   ✅ 지원 가능 - {result.reason}", flush=True)
@@ -264,18 +265,18 @@ def interviewer_node(state: AgentState):
     if isinstance(current_prefs, UserPreferences):
         current_prefs = current_prefs.model_dump(exclude_none=True)
     question_count = state.get("question_count", 0)
-    
+
     # 질문 횟수 증가
     question_count += 1
-    
+
     # 거부 키워드 감지
     rejection_keywords = ["몰라", "아무거나", "그냥 추천", "빨리", "모르겠", "상관없"]
     user_message = state["messages"][-1].content.lower() if state["messages"] else ""
     is_rejection = any(keyword in user_message for keyword in rejection_keywords)
-    
+
     # 질문 상한 또는 거부 감지 시 폴백 트리거
     should_fallback = (question_count >= 3) or (question_count >= 2 and is_rejection)
-    
+
     if should_fallback:
         # 폴백: 기본값으로 채우기
         fallback_prefs = {
@@ -288,12 +289,12 @@ def interviewer_node(state: AgentState):
             "target": current_prefs.get("target", "일반"),
         }
         fallback_frame_id = state.get("frame_id") or str(uuid.uuid4())
-        
+
         print(
             f"      ⚠️ [Fallback] 질문 상한 도달 또는 거부 감지. 기본값으로 추천 진행: {json.dumps(fallback_prefs, ensure_ascii=False)}",
             flush=True,
         )
-        
+
         return {
             "next_step": "researcher",
             "user_preferences": fallback_prefs,
@@ -323,7 +324,9 @@ def interviewer_node(state: AgentState):
     messages = [SystemMessage(content=formatted_prompt)] + state["messages"]
 
     try:
-        interview_result = SMART_LLM.with_structured_output(InterviewResult).invoke(messages)
+        interview_result = SMART_LLM.with_structured_output(InterviewResult).invoke(
+            messages
+        )
 
         current_query = state.get("user_query", "")
         recent_messages = state.get("messages", [])[-5:]
@@ -341,15 +344,17 @@ def interviewer_node(state: AgentState):
         # [★추가] 브랜드 제외 파싱 (세션 레벨 유지)
         session_exclude_brands = state.get("exclude_brands", [])
         current_exclude_brands, has_exclusion = parse_brand_exclusions(current_query)
-        
+
         # 새로운 제외 요청이 있으면 누적
         if has_exclusion:
-            session_exclude_brands = list(set(session_exclude_brands + current_exclude_brands))
+            session_exclude_brands = list(
+                set(session_exclude_brands + current_exclude_brands)
+            )
             print(
                 f"🚫 [Exclusion] Detected exclude_brands: {current_exclude_brands}, Session: {session_exclude_brands}",
                 flush=True,
             )
-        
+
         # 명시적 브랜드 요청 시 해당 브랜드 제외 목록에서 해제
         if current_prefs and current_prefs.get("brand"):
             requested_brand = current_prefs.get("brand")
@@ -369,7 +374,10 @@ def interviewer_node(state: AgentState):
                 f"🔄 [Frame] New frame created: {frame_id[:8]}... (intent={classification.intent})",
                 flush=True,
             )
-            print("📚 [History] Recommended history maintained (session-level)", flush=True)
+            print(
+                "📚 [History] Recommended history maintained (session-level)",
+                flush=True,
+            )
             # [★제거] DB 클리어 안 함 - 세션 내내 유지
         else:
             frame_id = current_frame_id or str(uuid.uuid4())
@@ -381,7 +389,11 @@ def interviewer_node(state: AgentState):
 
         merged_prefs: Dict[str, Any] = {}
         for slot in classification.keep_slots:
-            if current_prefs and slot in current_prefs and current_prefs[slot] is not None:
+            if (
+                current_prefs
+                and slot in current_prefs
+                and current_prefs[slot] is not None
+            ):
                 merged_prefs[slot] = current_prefs[slot]
 
         new_prefs = interview_result.user_preferences
@@ -425,33 +437,51 @@ def interviewer_node(state: AgentState):
             return {
                 "next_step": "researcher",
                 "user_preferences": merged_prefs,
-                "recommended_count": merged_prefs.get("recommended_count"),  # [★수정] 반환값에 명시적으로 포함
-                "is_count_explicit": merged_prefs.get("recommended_count") is not None,  # [★추가] 명시적 요청 여부
+                "recommended_count": merged_prefs.get(
+                    "recommended_count"
+                ),  # [★수정] 반환값에 명시적으로 포함
+                "is_count_explicit": merged_prefs.get("recommended_count")
+                is not None,  # [★추가] 명시적 요청 여부
                 "status": "모든 정보가 확인되었습니다. 추천 전략을 수립합니다...",
                 "active_mode": None,
                 "question_count": question_count,
                 "fallback_triggered": False,
                 "frame_id": frame_id,
-                "recommended_history": new_recommended_history if new_recommended_history is not None else state.get("recommended_history", []),
+                "recommended_history": (
+                    new_recommended_history
+                    if new_recommended_history is not None
+                    else state.get("recommended_history", [])
+                ),
                 "exclude_brands": session_exclude_brands,  # [★추가] 세션 레벨 제외 브랜드 유지
             }
 
         return {
             "messages": [AIMessage(content=interview_result.response_message)],
             "user_preferences": merged_prefs,
-            "recommended_count": merged_prefs.get("recommended_count"),  # [★수정] 반환값에 명시적으로 포함
-            "is_count_explicit": merged_prefs.get("recommended_count") is not None,  # [★추가] 명시적 요청 여부
+            "recommended_count": merged_prefs.get(
+                "recommended_count"
+            ),  # [★수정] 반환값에 명시적으로 포함
+            "is_count_explicit": merged_prefs.get("recommended_count")
+            is not None,  # [★추가] 명시적 요청 여부
             "active_mode": "interviewer",
             "next_step": "end",
             "question_count": question_count,
             "fallback_triggered": False,
             "frame_id": frame_id,
-            "recommended_history": new_recommended_history if new_recommended_history is not None else state.get("recommended_history", []),
+            "recommended_history": (
+                new_recommended_history
+                if new_recommended_history is not None
+                else state.get("recommended_history", [])
+            ),
             "exclude_brands": session_exclude_brands,  # [★추가] 세션 레벨 제외 브랜드 유지
         }
     except Exception as e:
         print(f"Interviewer Error: {e}")
-        return {"next_step": "writer", "question_count": question_count, "fallback_triggered": False}
+        return {
+            "next_step": "writer",
+            "question_count": question_count,
+            "fallback_triggered": False,
+        }
 
 
 # ==========================================
@@ -550,7 +580,7 @@ class RecoSearcher:
                     f"전략 의도: {plan_reason}\n\n"
                     "위 정보를 바탕으로, 사용자에게 보여줄 전략명을 작성하세요.\n\n"
                     "요구사항:\n"
-                    "- 한 문장으로 작성 (예: \"강인하고 자신감 있는 첫인상\", \"우아하고 세련된 분위기\")\n"
+                    '- 한 문장으로 작성 (예: "강인하고 자신감 있는 첫인상", "우아하고 세련된 분위기")\n'
                     "- 첫인상/무드 중심 표현 사용\n"
                     "- 다음 단어는 절대 사용 금지: 전략, 전략적, 이미지 강조, 이미지 보완, 이미지 반전\n\n"
                     "전략명:"
@@ -693,7 +723,10 @@ class RecoSearcher:
         try:
             exclude_ids = await self._snapshot_exclude_ids()
             # 로그: 전략별 검색 시 사용되는 제외 ID
-            print(f"   🔍 [Strategy {priority}] Searching with {len(exclude_ids)} exclusions", flush=True)
+            print(
+                f"   🔍 [Strategy {priority}] Searching with {len(exclude_ids)} exclusions",
+                flush=True,
+            )
             candidates, _match_type = await self._run_search(
                 h_filters,
                 s_filters,
@@ -723,13 +756,19 @@ class RecoSearcher:
 
         # 로그: 선택된 향수
         if selected_perfume:
-            print(f"   ✅ [Strategy {priority}] Selected perfume ID: {selected_perfume.get('id')}", flush=True)
+            print(
+                f"   ✅ [Strategy {priority}] Selected perfume ID: {selected_perfume.get('id')}",
+                flush=True,
+            )
 
         if not selected_perfume:
             try:
                 exclude_ids = await self._snapshot_exclude_ids()
                 # 로그: 재시도 시 제외 ID
-                print(f"   🔄 [Strategy {priority}] Retry with {len(exclude_ids)} exclusions", flush=True)
+                print(
+                    f"   🔄 [Strategy {priority}] Retry with {len(exclude_ids)} exclusions",
+                    flush=True,
+                )
                 candidates, _match_type = await self._run_search(
                     h_filters,
                     s_filters,
@@ -749,7 +788,10 @@ class RecoSearcher:
 
             # 로그: 재시도 후 선택된 향수
             if selected_perfume:
-                print(f"   ✅ [Strategy {priority}] Selected perfume ID (retry): {selected_perfume.get('id')}", flush=True)
+                print(
+                    f"   ✅ [Strategy {priority}] Selected perfume ID (retry): {selected_perfume.get('id')}",
+                    flush=True,
+                )
 
         if not selected_perfume:
             return {
@@ -902,18 +944,19 @@ class RecoWriter:
                 "\n[마지막 섹션 지시사항]: 이 섹션이 마지막이므로, 향수 설명과 [[SAVE:...]] 태그를 모두 작성한 후 "
                 "구분선(---)을 추가하고, 그 아래에 향수 사용에 대한 친절한 종합 의견을 2-3문장으로 작성해주세요. "
                 "예: '마지막으로, 향을 처음 들이실 땐 1~2번만 가볍게 뿌려서 내 살결에 어떻게 남는지부터 확인해보세요. "
-                "데일리일수록 \"과하지 않은 잔향\"이 가장 오래 갑니다.'"
+                '데일리일수록 "과하지 않은 잔향"이 가장 오래 갑니다.\''
             )
-
 
         if expression_text:
             content_parts.append(f"\n[감각 표현 참고]:\n{expression_text}")
 
         content_parts.append(f"\n[참고 데이터]:\n{data_ctx}")
 
-        messages = [SystemMessage(content=section_system)] + self.state.get(
-            "messages", []
-        ) + [HumanMessage(content="\n".join(content_parts))]
+        messages = (
+            [SystemMessage(content=section_system)]
+            + self.state.get("messages", [])
+            + [HumanMessage(content="\n".join(content_parts))]
+        )
 
         try:
             result_text = ""
@@ -994,7 +1037,10 @@ async def parallel_reco_node(state: AgentState):
 
     # 로그: 히스토리 기반 제외 ID
     if session_exclude_ids:
-        print(f"🚫 [Exclude] History-based exclusions: {sorted(list(session_exclude_ids))}", flush=True)
+        print(
+            f"🚫 [Exclude] History-based exclusions: {sorted(list(session_exclude_ids))}",
+            flush=True,
+        )
 
     if use_case == "SELF":
         disliked_ids = []
@@ -1010,7 +1056,10 @@ async def parallel_reco_node(state: AgentState):
 
     # 로그: 최종 제외 ID 총합
     if session_exclude_ids:
-        print(f"🚫 [Exclude] Total session exclusions: {len(session_exclude_ids)} IDs", flush=True)
+        print(
+            f"🚫 [Exclude] Total session exclusions: {len(session_exclude_ids)} IDs",
+            flush=True,
+        )
     else:
         print(f"✅ [Exclude] No exclusions for this session", flush=True)
 
@@ -1084,9 +1133,7 @@ async def parallel_reco_node(state: AgentState):
             error_type = result.get("error_type", "unknown")
             error_detail = result.get("error_detail", "")
             if error_type not in {"no_results", "no_candidates"}:
-                errors_encountered.append(
-                    {"type": error_type, "detail": error_detail}
-                )
+                errors_encountered.append({"type": error_type, "detail": error_detail})
             continue
 
         if pending_result:
@@ -1142,7 +1189,9 @@ async def parallel_reco_node(state: AgentState):
         # 케이스 1: 과다 요청 메시지
         pre_notice_msg = generate_pre_notice(requested_count, is_explicit)
         # 케이스 2: 부분 실패 메시지
-        post_notice_msg = generate_post_notice(requested_count, actual_count, is_explicit)
+        post_notice_msg = generate_post_notice(
+            requested_count, actual_count, is_explicit
+        )
 
         # 하나만 선택해서 추가 (우선순위: 케이스 1 > 케이스 2)
         notice_msg = ""
@@ -1197,18 +1246,25 @@ async def parallel_reco_node(state: AgentState):
 
     # 로그: 이번 배치에서 추천된 향수 ID들
     if current_batch_ids:
-        print(f"✨ [Batch] Recommended perfume IDs in this batch: {current_batch_ids}", flush=True)
+        print(
+            f"✨ [Batch] Recommended perfume IDs in this batch: {current_batch_ids}",
+            flush=True,
+        )
 
     updated_history = _merge_unique_ids(merged_history, current_batch_ids)
 
     # 로그: 업데이트된 전체 히스토리
     if updated_history != merged_history:
-        print(f"📚 [History] Updated total history: {len(updated_history)} IDs", flush=True)
+        print(
+            f"📚 [History] Updated total history: {len(updated_history)} IDs",
+            flush=True,
+        )
 
     # [★추가] DB에 recommended_history 저장 (thread_id 안전성 검증)
     thread_id = state.get("thread_id")
     if thread_id and current_batch_ids:
         from .database import update_recommended_history
+
         try:
             update_recommended_history(thread_id, current_batch_ids, max_size=100)
         except Exception as e:
@@ -1229,14 +1285,14 @@ async def parallel_reco_node(state: AgentState):
 def parallel_reco_result_router(state: AgentState):
     """
     chat_outcome_status 값에 따라 다음 노드로 라우팅합니다.
-    
+
     Returns:
         다음 노드 이름 ('parallel_reco_ok_writer' | 'parallel_reco_no_results' | 'parallel_reco_error')
     """
     status = state.get("chat_outcome_status", "OK")
-    
+
     print(f"\n🔀 [Reco Router] Status: {status}", flush=True)
-    
+
     if status == "NO_RESULTS":
         return "parallel_reco_no_results"
     elif status == "ERROR":
@@ -1259,17 +1315,17 @@ async def parallel_reco_no_results(state: AgentState):
     NO_RESULTS 상태일 때 - WRITER_FAILURE_PROMPT 사용하여 대안 제시.
     """
     print(f"\n⚠️ [Reco No Results] 검색 결과 없음 처리", flush=True)
-    
+
     user_prefs = state.get("user_preferences", {})
     current_context = json.dumps(user_prefs, ensure_ascii=False)
-    
+
     fallback_messages = [
         SystemMessage(content=WRITER_FAILURE_PROMPT),
-        HumanMessage(content=f"사용자 정보: {current_context}")
+        HumanMessage(content=f"사용자 정보: {current_context}"),
     ]
-    
+
     fallback_response = await SUPER_SMART_LLM.ainvoke(fallback_messages)
-    
+
     return {"messages": [AIMessage(content=fallback_response.content)]}
 
 
@@ -1294,7 +1350,7 @@ async def out_of_scope_handler(_state: AgentState):
 
     return {
         "messages": [AIMessage(content=fixed_msg)],
-        "chat_outcome_status": "OUT_OF_SCOPE"
+        "chat_outcome_status": "OUT_OF_SCOPE",
     }
 
 
@@ -1310,52 +1366,61 @@ async def unsupported_request_handler(_state: AgentState):
     category_messages = {
         "제형": {
             "reason": "워터 퍼퓸, 오일 퍼퓸, 고체 향수 등 제형별 검색은 현재 지원하지 않습니다.",
-            "alternative": "대신 원하시는 느낌(가벼운, 시원한, 물기 있는 등)을 말씀해주시면 비슷한 향수를 추천해드리겠습니다."
+            "alternative": "대신 원하시는 느낌(가벼운, 시원한, 물기 있는 등)을 말씀해주시면 비슷한 향수를 추천해드리겠습니다.",
         },
         "성능": {
             "reason": "발향력, 지속력, 잔향 등 성능 정보는 데이터베이스에 없습니다.",
-            "alternative": "대신 계절이나 상황에 맞는 향수를 추천해드릴 수 있습니다."
+            "alternative": "대신 계절이나 상황에 맞는 향수를 추천해드릴 수 있습니다.",
         },
         "가격": {
             "reason": "가격대별 검색은 지원하지 않습니다.",
-            "alternative": "브랜드나 분위기로 검색하시면 원하시는 스타일을 찾으실 수 있습니다."
+            "alternative": "브랜드나 분위기로 검색하시면 원하시는 스타일을 찾으실 수 있습니다.",
         },
         "레이어링": {
             "reason": "레이어링이나 조합 추천은 현재 지원하지 않습니다.",
-            "alternative": "개별 향수 추천은 가능합니다! 레이어링 관련 질문은 Scentence의 레이어링 관련 서비스에서 진행해주세요!"
+            "alternative": "개별 향수 추천은 가능합니다! 레이어링 관련 질문은 Scentence의 레이어링 관련 서비스에서 진행해주세요!",
         },
         "구매정보": {
             "reason": "구매처나 매장 정보는 제공하지 않습니다.",
-            "alternative": "특정 향수 정보를 알려드릴 수 있습니다."
+            "alternative": "특정 향수 정보를 알려드릴 수 있습니다.",
         },
         "물리적": {
             "reason": "용량, 크기 등 물리적 정보는 보유하고 있지 않습니다.",
-            "alternative": "향수의 특성(어코드, 노트 등)으로 검색해드릴 수 있습니다."
+            "alternative": "향수의 특성(어코드, 노트 등)으로 검색해드릴 수 있습니다.",
         },
         "추천_이유": {
             "reason": "추천 기준이나 이유에 대한 정보는 제공되지 않습니다.",
-            "alternative": "대신 추천된 향수의 특성(어코드, 노트 등)에 대해 자세히 설명해드릴까요?"
+            "alternative": "대신 추천된 향수의 특성(어코드, 노트 등)에 대해 자세히 설명해드릴까요?",
         },
         "브랜드_전체": {
             "reason": "브랜드 전체 설명이나 브랜드의 모든 향수 나열은 지원하지 않습니다.",
-            "alternative": "특정 향수명을 말씀해주시면 해당 향수에 대해 상세히 설명해드리겠습니다."
+            "alternative": "특정 향수명을 말씀해주시면 해당 향수에 대해 상세히 설명해드리겠습니다.",
         },
         "향수_비교": {
             "reason": "두 향수를 비교하는 기능은 현재 지원하지 않습니다.",
-            "alternative": "각 향수의 특성을 개별적으로 설명해드릴까요?"
+            "alternative": "각 향수의 특성을 개별적으로 설명해드릴까요?",
+        },
+        "인사": {
+            "reason": "안녕하세요",
+            "alternative": "저는 맞춤형 향수추천 AI 입니다. 향수에 관해 질문해주시면 정확한 정보로 답변드리겠습니다!",
         },
     }
 
-    msg_data = category_messages.get(category, {
-        "reason": "해당 요청은 현재 지원하지 않습니다.",
-        "alternative": "다른 방식으로 질문해주시면 도움드리겠습니다."
-    })
-    
+    msg_data = category_messages.get(
+        category,
+        {
+            "reason": "해당 요청은 현재 지원하지 않습니다.",
+            "alternative": "다른 방식으로 질문해주시면 도움드리겠습니다.",
+        },
+    )
+
     specific_msg = f"죄송합니다. {msg_data['reason']}\n\n💡 {msg_data['alternative']}"
+    if msg_data["reason"] == "안녕하세요":
+        specific_msg = f"{msg_data['reason']}!\n\n{msg_data['alternative']}"
 
     return {
         "messages": [AIMessage(content=specific_msg)],
-        "chat_outcome_status": "UNSUPPORTED_REQUEST"
+        "chat_outcome_status": "UNSUPPORTED_REQUEST",
     }
 
 
@@ -1385,10 +1450,7 @@ workflow.add_edge(START, "pre_validator")
 workflow.add_conditional_edges(
     "pre_validator",
     lambda x: x.get("validation_result", "supported"),
-    {
-        "supported": "supervisor",
-        "unsupported": "unsupported_request_handler"
-    }
+    {"supported": "supervisor", "unsupported": "unsupported_request_handler"},
 )
 
 workflow.add_conditional_edges(
